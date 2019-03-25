@@ -1,0 +1,224 @@
+---
+title: "exploration"
+author: "Mathilde Mousset"
+date: "22 mars 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Fichier commune
+
+## Communes
+
+```{r}
+nrow(commune)
+
+# Nb de communes par département
+communes %>% 
+  count(departement_nom, sort = TRUE) %>% 
+  mutate(departement_nom = fct_reorder(departement_nom, n)) %>% 
+  ggplot(aes(x = departement_nom, y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Nb dommunes par departement")
+```
+
+Let's try to get a map
+
+```{r map}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2)) +
+  labs(title = "Les communes d'occitanie")
+```
+
+
+```{r map_big_town}
+map_occitanie +
+  geom_point(data = filter(communes, habitants_2014 > 10000),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy)) +
+  labs(title = "Les communes d'occitanie",
+       subtitle = "Communes de plus de 10000 habitants")
+```
+
+```{r map_villages}
+map_occitanie +
+  geom_point(data = filter(communes, 
+                           habitants_2014 < 3000),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy)) +
+  labs(title = "Les communes d'occitanie",
+       subtitle = "Communes de moins de 3000 habitants")
+
+
+map_occitanie +
+  geom_point(data = filter(communes, 
+                           habitants_2014 < 1000),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy)) +
+  labs(title = "Les communes d'occitanie",
+       subtitle = "Communes de moins de 1000 habitants")
+```
+
+
+
+## Superficie communes
+
+```{r}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy = mean(superficie),
+            var = var(superficie),
+            sd  = sd(superficie))
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = superficie)) +
+  geom_histogram() +
+  facet_wrap(~departement_nom)
+```
+
+## Habitants
+
+```{r}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy = mean(habitants_2014),
+            var = var(habitants_2014),
+            sd  = sd(habitants_2014))
+```
+
+```{r}
+communes %>% 
+  ggplot(aes(x = habitants_2014)) +
+  geom_histogram() +
+  facet_wrap(~habitants_2014)
+```
+
+
+```{r map_habitants}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2,
+                 colour = log(habitants_2014))) +
+  labs(title = "Les communes d'occitanie",
+       subtitle = "Communes de plus de 10000 habitants")
+```
+
+
+```{r}
+map_occitanie_communes +
+  aes(fill = log_habitants_2014) +
+  labs(title   = "Les communes d'occitanie",
+       subtitle = "Nb d'habitants") +
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+## Proportion d'habitants actifs
+
+Il y a quatres communes avec plus d'habitants actifs que d'habitants en 2014.
+
+```{r}
+communes %>% 
+  filter(prop_habitants_actifs_2014 > 1) %>% 
+  select(commune, habitants_2014, personnes_actives_2014)
+```
+
+Et il y a des communes sans habitants actifs...
+
+```{r}
+communes %>% 
+  filter(prop_habitants_actifs_2014 == 0) %>% 
+  select(commune, habitants_2014, personnes_actives_2014)
+
+# Where?
+sf_communes %>% 
+  ggplot() +
+  geom_sf(colour = "black", fill = "white") +
+  coord_sf(crs = 4326, datum = sf::st_crs(4326))  +
+  theme_minimal() +
+  geom_sf(data = filter(prop_habitants_actifs_2014 == 0),          fill = "red") +
+  labs(title   = "Les communes d'occitanie",
+       subtitle = "Nb d'habitants") +
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+```{r}
+communes %>% 
+  filter(prop_habitants_actifs_2014 <= 1 ) %>% 
+  ggplot(aes(x = prop_habitants_actifs_2014)) +
+  geom_histogram() +
+  facet_wrap(~departement_nom)
+
+library(ggridges)
+
+communes %>% 
+  filter(prop_habitants_actifs_2014 <= 1 ) %>% 
+  ggplot(aes(x = prop_habitants_actifs_2014,
+             y = departement_nom,
+             fill = ..x..)) +
+  geom_density_ridges_gradient(scale = 2) +
+  theme_ridges(grid = FALSE, 
+               center_axis_labels = TRUE) +
+  scale_fill_viridis_c() +
+  labs(title = "Proportion d'habitants actifs en 2014 par département")
+```
+
+
+Comment est-ce que le nombre de personnes actives est correlé avec le nombre d'habitants ?
+La variance augmente ave le nombre d'habitants, mais les deux sont très bien correlées.
+
+```{r}
+communes %>% 
+  ggplot(aes(x = habitants_2014, 
+             y = personnes_actives_2014)) +
+  geom_point() +
+    labs(title = "Habitants et habitants actifs 2014")
+
+
+communes %>% 
+  filter(habitants_2014 < 20000) %>% 
+  ggplot(aes(x = habitants_2014, 
+             y = personnes_actives_2014)) +
+  geom_point() +
+  labs(title = "Habitants et habitants actifs 2014",
+       subtitle = "Communes de moins de 20 000 habitants")
+```
+
+
+# DataExplorer
+
+```{r}
+library(DataExplorer)
+
+plot_str(communes)
+
+introduce(communes)
+plot_intro(communes)  # WTF 23.4 missing obs?
+```
+
+Ok, il faudra faire bien gaffe aux dernières colonnes, les données manquent.
+
+```{r}
+plot_missing(communes)
+
+# Est-ce que c'est du au fait que des colonnes ne soient que pour les communes avec plus de 100 habitants ?
+# Nope
+plot_missing(filter(communes,
+                    habitants_2014 > 100))
+```
+

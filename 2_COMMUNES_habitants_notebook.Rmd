@@ -1,0 +1,668 @@
+---
+title: "Exploration de la population des communes"
+output: 
+  html_notebook: 
+    code_folding: hide
+    fig_height: 10
+    fig_width: 15
+    theme: cosmo
+    toc: yes
+author: "Mathilde Mousset"
+date: "26 mars 2019"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(extrafont)
+library(ggridges)
+library(sf)
+
+source("0_import_clean_data.R")
+```
+
+```{r my_theme, echo=FALSE}
+plot_background_colour <- "white"
+strip_background_colour <- "white"
+grid_colour <- "white"
+
+text_colour  <- "grey10"
+title_colour <- "grey10"
+axis_colour  <- "grey10"
+
+bar_col1 <- "#5F5293"
+bar_col2 <- "#11073B"
+
+gradient_high <-  "#11073B"
+gradient_low <-  "white"
+
+my_theme <- theme(
+  
+  # Text in general
+  text = element_text(family = "Roboto Condensed",
+                      colour = text_colour),
+  
+  # Title, subtitle, caption
+  plot.title    = element_text(size = 16,
+                               lineheight = 1.6,
+                               face = "bold",
+                               colour = title_colour),
+  plot.subtitle = element_text(size = 12,
+                               lineheight = 1),
+  plot.caption  = element_text(size = 12),
+  
+  # Facet
+  strip.background = element_rect(fill = strip_background_colour),
+  strip.text = element_text(size = 12,
+                            face = "bold"),
+  
+  
+  # Axes
+  axis.text  = element_text(size = 12,
+                            face = "bold"),
+  #axis.text.x = element_text(vjust = 1),
+  #axis.text.y = element_text(hjust = 1),
+  
+  axis.title = element_text(size = 14,
+                            face = "bold"),
+  axis.line  = element_line(size = 0.5,
+                            colour = axis_colour),
+  
+  # Legend
+  legend.title = element_text(size = 12, 
+                              face = "bold"), 
+  legend.text = element_text(size = 12),
+  legend.background = element_rect(fill = plot_background_colour),
+  
+  # Background
+  panel.background = element_rect(fill = plot_background_colour,
+                                  colour = NA),
+  plot.background  = element_rect(fill = plot_background_colour,
+                                  colour = NA),
+  
+  # Grids
+  panel.grid.major = element_line(colour = grid_colour,
+                                  size = 0.2,
+                                  linetype = "dashed"),
+  panel.grid.minor = element_line(colour = grid_colour, 
+                                  size = 0.2, 
+                                  linetype = "dashed"),
+  
+  # Borders
+  panel.border = element_blank())
+
+```
+
+# Infos générales
+
+`r nrow(communes)` 4516 communes en Occitanie.
+
+
+Nb de communes par département:
+
+```{r}
+communes %>% 
+  count(departement_nom, sort = TRUE) %>% 
+  mutate(departement_nom = fct_reorder(departement_nom, n)) %>% 
+  
+  ggplot(aes(x = departement_nom, y = n)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nb de communes par departement en Occitanie",
+       subtitle = "",
+       x = "", 
+       y = "Nombre de communes",
+       caption = "Toulouse Hackaviz 2019") +
+  my_theme 
+```
+
+Let's try to get a map
+
+```{r map_communes, fig.width=15}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2),
+             size = 3, alpha = 0.5,
+             colour = bar_col1) +
+  
+  labs(title = "Localisation des communes en Occitanie",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") 
+```
+
+
+```{r map_big_town, fig.width=10}
+map_occitanie +
+  geom_point(data = filter(communes, habitants_2014 > 10000),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy),
+             size = 4) +
+  labs(title = "Communes de plus de 10000 habitants en Occitanie",
+       subtitle = "",
+       x = "", y = "",
+       colour = "Altitude moyenne",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r map_villages, fig.width=10}
+map_occitanie +
+  geom_point(data = filter(communes, 
+                           habitants_2014 < 3000),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy),
+             size = 3) +
+  labs(title = "Communes de moins de 3000 habitants en Occitanie",
+       subtitle = "",
+       x = "", y = "",
+       colour = "Altitude moyenne",
+       caption = "Toulouse Hackaviz 2019")
+
+
+map_occitanie +
+  geom_point(data = filter(communes, 
+                           habitants_2014 < 500),
+             aes(x = longitude2, y = latitude2,
+                 colour = altitude_moy),
+             size = 3) +
+  labs(title = "Communes de moins de 500 habitants en Occitanie",
+       subtitle = "",
+       x = "", y = "",
+       colour = "Altitude moyenne",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r map_pop_class, fig.width=15}
+map_occitanie_communes +
+ aes(fill = pop_classification) +
+  
+  labs(title   = "Classification des communes d'Occitanie par taille de population",
+       subtitle = "Nb d'habitants en 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+
+```{r map_type_commune, fig.width=15}
+map_occitanie_communes +
+ aes(fill = type_commune) +
+  
+  labs(title   = "Classification de la taille des communes en Occitanie",
+       subtitle = "Basée sur le nombre d'habitants en 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") +
+  scale_fill_brewer(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+# Superficie communes
+
+```{r}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy = mean(superficie),
+            var = var(superficie),
+            sd  = sd(superficie))
+```
+
+
+```{r, fig.width=10}
+communes %>% 
+  ggplot(aes(x = superficie)) +
+  geom_histogram() +
+  facet_wrap(~departement_nom, scales = "free") +
+  
+  labs(title = "Superficie des communes d'Occitanie",
+       x = "Aire en hectares",
+       y = "Nb de communes")
+```
+
+
+# Habitants
+
+```{r}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy = mean(habitants_2014),
+            var = var(habitants_2014),
+            sd  = sd(habitants_2014))
+```
+
+```{r, fig.width=10}
+communes %>% 
+  ggplot(aes(x = habitants_2014)) +
+  geom_histogram() +
+  facet_wrap(~departement_nom, scales = "free") +
+  labs(title = "Distribution de la population en Occitanie",
+       subtitle = "Données de 2014",
+       x = "Nombre d'habitants",
+       y = "Nombre de communes")
+```
+
+
+```{r map_habitants, fig.width=15}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2,
+                 colour = log_habitants_2014),
+             size = 3, alpha = 0.7) +
+  labs(title = "Nombre d'habitants par commune",
+       subtitle = "Données 2014",
+        x = "", y = "",
+       colour = "Log nb habitants",
+       caption = "Toulouse Hackaviz 2019") +
+  scale_colour_gradient(low = gradient_low,
+                        high = gradient_high)
+```
+
+
+```{r, fig.width=15}
+map_occitanie_communes +
+  aes(fill = log_habitants_2014) +
+  
+  labs(title   = "Nb d'habitants par commune en Occitanie",
+       subtitle = "Nb d'habitants en 2014",
+        x = "", y = "",
+       fill = "Log nb habitants",
+       caption = "Toulouse Hackaviz 2019") +
+   scale_fill_gradient(low = gradient_low,
+                        high = gradient_high)
+
+  # scale_fill_distiller(type = "seq",
+  #                      palette = "Oranges",
+  #                      direction = 1)
+```
+
+
+## Proportion d'habitants actifs
+
+## Weird cases
+
+Il y a quatres communes avec plus d'habitants actifs que d'habitants en 2014. La grosse différence est pour CAUNNETTE sur Lauquet (6 -> 23, ça fait une sacrée différence...).
+
+```{r sup_1}
+communes %>% 
+  filter(prop_habitants_actifs_2014 > 1) %>% 
+  select(commune, habitants_2014, personnes_actives_2014)
+```
+
+Et il y a des communes sans habitants actifs...
+
+```{r zero}
+communes %>% 
+  filter(prop_habitants_actifs_2014 == 0) %>% 
+  select(commune, habitants_2014, personnes_actives_2014)
+
+# Where?
+sf_communes %>% 
+  ggplot() +
+  geom_sf(colour = "black", fill = "white") +
+  coord_sf(crs = 4326, datum = sf::st_crs(4326))  +
+  theme_minimal() +
+  geom_sf(data = filter(sf_communes,
+                        prop_habitants_actifs_2014 == 0),          fill = "red") +
+  labs(title   = "Les communes d'occitanie",
+       subtitle = "Nb d'habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+# Distribution
+
+```{r prop_hist, fig.width=15}
+communes %>% 
+  filter(prop_habitants_actifs_2014 <= 1 ) %>% 
+  ggplot(aes(x = prop_habitants_actifs_2014)) +
+  geom_histogram() +
+  facet_wrap(~departement_nom, scales = "free") +
+  labs(title = "Distribution du nombre d'habitants actifs par commune",
+       subtitle = "Données 2014 en Occitanie")
+```
+
+
+```{r prop_ridges, fig.width=15}
+communes %>% 
+  filter(prop_habitants_actifs_2014 <= 1 ) %>% 
+  
+  ggplot(aes(x = prop_habitants_actifs_2014,
+             y = departement_nom,
+             fill = ..x..)) +
+  geom_density_ridges_gradient(scale = 2) +
+ 
+   theme_ridges(grid = FALSE, 
+               center_axis_labels = TRUE) +
+    scale_fill_gradient(low = gradient_low,
+                        high = gradient_high) +
+  labs(title = "Proportion d'habitants actifs par département",
+       subtitle = "Occitanie, 2014",
+       x = "Proportion d'habitants actifs",
+       y = "",
+       fill = "",
+       caption = "Toulouse Hackaviz 2019")
+
+```
+
+
+Comment est-ce que le nombre de personnes actives est correlé avec le nombre d'habitants ?
+La variance augmente avec le nombre d'habitants, mais les deux sont très bien correlées.
+
+```{r reg_hab.actifs}
+communes %>% 
+  ggplot(aes(x = habitants_2014, 
+             y = personnes_actives_2014)) +
+  geom_point() +
+  labs(title = "Habitants et habitants actifs 2014",
+       caption = "Toulouse Hackaviz 2019") +
+  geom_smooth()
+
+
+communes %>% 
+  filter(habitants_2014 < 20000) %>% 
+  ggplot(aes(x = habitants_2014, 
+             y = personnes_actives_2014)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Habitants et habitants actifs 2014",
+       subtitle = "Communes de moins de 20 000 habitants",
+       x = "Nb habitants",
+       y = "Nb personnes actives",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Pas la peine de se prendre trop la tête là dessus.
+
+Une bonne carte des habitants actifs fera l'affaire : 
+
+```{r map_prop_hab_actifs_2014, fig.width=15}
+map_occitanie_communes +
+ geom_sf(data = filter(sf_communes, 
+                    prop_habitants_actifs_2014 <= 1),
+         aes(fill = prop_habitants_actifs_2014)) +
+  
+  labs(title   = "Nombre d'habitants actifs par commune en Occitanie",
+       subtitle = "Données : 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") +
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+# Peuplement et taille
+
+## Habitants et superficie
+
+```{r}
+communes %>% 
+  ggplot(aes(x = superficie, y = habitants_2014)) +
+  geom_point() +
+  
+  labs(title   = "Superficie et nb d'habitants",
+       subtitle = "All data, 2014",
+       x = "Superficie", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r, fig.width=15}
+communes %>% 
+  ggplot(aes(x = superficie, y = habitants_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~pop_classification, scales = "free") +
+  
+  labs(title   = "Superficie et nb d'habitants",
+       subtitle = "All data, 2014",
+       x = "Superficie", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Si on enlève les communes super ultra peuplées
+
+```{r}
+communes %>% 
+  filter(habitants_2014 < 100000) %>% 
+  
+  ggplot(aes(x = superficie, y = habitants_2014)) +
+  geom_point() +
+  geom_smooth() +
+  
+  labs(title   = "Superficie et nb d'habitants",
+       subtitle = "Communes de moins de 100 000 habitants (2014)",
+       x = "Superficie", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Le signal est pas ultra clair.
+
+
+## Habitants actifs 2014 et superficie
+
+```{r}
+communes %>% 
+  ggplot(aes(x = superficie, y = personnes_actives_2014)) +
+  geom_point() +
+  
+  labs(title   = "Superficie et nb d'habitants actifs",
+       subtitle = "All data, 2014",
+       x = "Superficie", 
+       y = "Nb habitants actifs",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Si on enlève les communes super ultra peuplées
+
+```{r}
+communes %>% 
+  filter(personnes_actives_2014 < 100000) %>% 
+  
+  ggplot(aes(x = superficie, y = personnes_actives_2014)) +
+  geom_point() +
+  geom_smooth() +
+  
+  labs(title   = "Superficie et nb d'habitants actifs",
+       subtitle = "Communes de moins de 100 000 habitants actifs (2014)",
+       x = "Superficie", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Signal pas ultra clair. Je pense que c'est parce que l'on a des petites communes peu peuplées, des petites communes très peuplées, et des grandes communes très peuplées (agglo) et des grandes communes peu peuplées (ex : dans les Pyrénées).
+
+
+## Nb habitants per hectare
+
+Pour résummer ce que je viens de regarder, je fais une variable habitants par hectare => densité de population.
+
+```{r densite_pop}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(densite_moyenne_2014 = mean(habitants_per_hectare)) %>% 
+  mutate(departement_nom = fct_reorder(departement_nom, densite_moyenne_2014)) %>% 
+  ggplot(aes(x = departement_nom, y = densite_moyenne_2014)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title   = "Densité de population",
+       subtitle = "All data, 2014",
+       y = "Nb habitants par hectare", 
+       x = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Toutes communes confondues, l'Herault a la plus forte densité de pop per commune, suivi de la Haute Garonne.
+
+
+```{r densite_pop_faceted, fig.width=15}
+communes %>% 
+  group_by(departement_nom, pop_classification) %>% 
+  summarise(densite_moyenne_2014 = mean(habitants_per_hectare)) %>% 
+  ungroup() %>% 
+  mutate(departement_nom = fct_reorder(departement_nom, 
+                                       densite_moyenne_2014)) %>% 
+  ggplot(aes(x = departement_nom, y = densite_moyenne_2014)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~pop_classification) +
+  
+  labs(title   = "Densité de population",
+       subtitle = "Par taille de commune, 2014",
+       y = "Nb habitants par hectare", 
+       x = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_densite, fig.width=15}
+map_occitanie_communes +
+  aes(fill = habitants_per_hectare)  +
+  
+  labs(title   = "Densité de population en Occitanie",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+# Peuplement et altitude
+
+```{r}
+communes %>% 
+  ggplot(aes(x = altitude_moy, y = habitants_2014)) +
+  geom_point() +
+  
+  labs(title   = "Altitude et nb d'habitants",
+       subtitle = "All data, 2014",
+       x = "Altitude moyenne", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+
+```
+
+Bon, j'en ai marre, je crée des classes de population et d'altitude.
+
+
+```{r, fig.width=15}
+communes %>% 
+   ggplot(aes(x = altitude_moy, y = habitants_2014)) +
+  geom_point() +
+  facet_wrap(~pop_classification, scales = "free") +
+  
+  labs(title   = "Altitude et nb d'habitants",
+       subtitle = "All data, 2014",
+       x = "Altitude moyenne", 
+       y = "Nb habitants",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+# Ménages 2014
+
+```{r}
+communes %>%
+  ggplot(aes(x = menages_2014)) +
+  geom_histogram()
+
+communes %>%
+  filter(menages_2014 < 1000) %>% 
+  ggplot(aes(x = menages_2014)) +
+  geom_histogram()
+```
+
+
+Communes avec zero ménages. Pourquoi ? Il y en a pas mal quand même... (824). Je propose de laisser tomber la mesure des ménages pour la suite, elle a l'air zarb.
+
+```{r}
+communes %>% 
+  filter(menages_2014 == 0) %>% 
+  select(commune, menages_2014, habitants_2014, personnes_actives_2014)
+```
+
+
+## Taille des ménages
+
+Taille des ménages en Occitanie
+
+```{r}
+mean(communes$taille_menage_2014, na.rm = TRUE)
+```
+
+Peu de variation par département.
+
+```{r}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(menage_moy = mean(taille_menage_2014, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(departement_nom  = fct_reorder(departement_nom,
+                                       menage_moy)) %>% 
+  ggplot(aes(x = departement_nom, y = menage_moy)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Taille moyenne des ménages en Occitanie",
+       subtitle = "Moyenne départementale, données 2014",
+       x = "",
+       y = "Taille ménage moyen")
+```
+
+Par nb d'habitants de commune
+
+```{r}
+communes %>% 
+  group_by(pop_classification) %>% 
+  summarise(menage_moy = mean(taille_menage_2014, na.rm = TRUE)) %>% 
+  ggplot(aes(x = pop_classification, y = menage_moy)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Taille moyenne des ménages en Occitanie",
+       subtitle = "Moyenne par taille d'agglo, données 2014",
+       x = "",
+       y = "Taille ménage moyen")
+```
+
+
+```{r}
+communes %>% 
+  group_by(type_commune) %>% 
+  summarise(menage_moy = mean(taille_menage_2014, 
+                              na.rm = TRUE)) %>% 
+  ggplot(aes(x = type_commune, y = menage_moy)) +
+  geom_col() +
+  coord_flip() +
+   labs(title = "Taille moyenne des ménages en Occitanie",
+       subtitle = "Moyenne par type d'agglo, données 2014",
+       x = "",
+       y = "Taille ménage moyen")
+```
+
+Il y a un petit creux pour les villes moyennes
+
+Bon, on plote ça et on laisse tomber cette variable.
+
+```{r map_taille_menages, fig.width=15}
+map_occitanie_communes +
+  aes(fill = taille_menage_2014)  +
+  
+  labs(title   = "Taille moyenne des ménages en Occitanie",
+       subtitle = "Données de 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+

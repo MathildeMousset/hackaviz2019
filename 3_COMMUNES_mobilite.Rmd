@@ -1,0 +1,179 @@
+---
+title: "Exploration des données de mobilité"
+output: 
+  html_notebook: 
+    code_folding: hide
+    fig_width: 10
+    theme: cosmo
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#knitr::opts_chunk$set(fig.width = 8, fig.height = 6)
+
+library(tidyverse)
+
+source("0_import_clean_data.R")
+```
+
+
+# Emploi
+
+Explorons l'attractivité des communes en terme d'emplois.
+
+## Données brutes
+
+Par département.
+La Haute Garonne est largement en tête, suivie de l'Herault. Pas surprenant, avec Toulouse et Montepllier.
+
+```{r emploi_brut_dep, out.width = "150%"}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(emplois_tot = sum(emplois_2017, na.rm = TRUE)) %>% 
+  mutate(departement_nom = fct_reorder(departement_nom,
+                                       emplois_tot)) %>% 
+  ggplot(aes(x = departement_nom, y = emplois_tot)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nombre total d'emploi dans les départements d'Occitanie",
+       subtitle = "Données 2017",
+       x = "", 
+       y = "Nb total d'emplois",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Quelles sont les villes attractives ?
+
+```{r emploi_brut_ville, fig.width=10}
+communes %>% 
+  group_by(departement_nom, commune) %>% 
+  summarise(emplois_tot = sum(emplois_2017, na.rm = TRUE)) %>% 
+  top_n(3, wt = emplois_tot) %>% 
+  ungroup() %>% 
+  mutate(commune = fct_reorder(commune,
+                               emplois_tot)) %>% 
+  ggplot(aes(x = commune, y = emplois_tot,
+             fill = departement_nom)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nombre total d'emploi: les 3 meilleures villes par département",
+       subtitle = "Données 2017",
+       x = "", 
+       y = "Nb total d'emplois",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+## Par nb personnes actives
+
+Attention, la mesure n'est pas exacte, on divise le nombre d'emploi en 2017 par le nombre de personnes actives en 2015. je peux pas faire mieux. Après, ça doit pas changer tant que ça en deux ans, si ?
+
+Bon, c'est bien, on sait qu'il y a plein d'emploi à Toulouse, et encore un peu à Montpellier, mais ça fait cmbien d'emplois par personne "active" ?
+
+```{r emploi_per_hab1}
+communes %>% 
+  group_by(departement_nom) %>% 
+  summarise(emplois_moy = mean(emploi_par_habitant_actif, 
+                               na.rm = TRUE)) %>% 
+  mutate(departement_nom = fct_reorder(departement_nom,
+                                       emplois_moy)) %>% 
+  ggplot(aes(x = departement_nom, y = emplois_moy)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nombre moyen d'emploi par habitant actif en Occitanie",
+       subtitle = "Données emploi 2017, données personnes actives 2015",
+       x = "", 
+       y = "Nb d'emplois par habitant actif",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Distribution (en enlevant GERM, où il y a 28 emploi par habitant actif...wtf?)
+```{r emploi.hab}
+communes %>% 
+  filter(emploi_par_habitant_actif < 4) %>% 
+  ggplot(aes(x = emploi_par_habitant_actif)) +
+  geom_histogram() +
+   labs(title = "Nombre d'emploi par habitant actif",
+       subtitle = "Données emploi 2017, données personnes actives 2015",
+       x = "Nb d'emplois par habitant actif", 
+       y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Quelles sont les 10 meilleures villes ?
+
+
+```{r emploi_hab_ville}
+communes %>% 
+  top_n(10, wt = emploi_par_habitant_actif) %>% 
+  mutate(commune = fct_reorder(commune,
+                               emploi_par_habitant_actif)) %>% 
+  ggplot(aes(x = commune, y = emploi_par_habitant_actif,
+             fill = departement_nom)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nombre d'emploi par habitant actif: les dix meilleures villes d'Occitanie",
+       subtitle = "Données emploi 2017, données personnes actives 2015",
+       x = "", 
+       y = "Nb d'emploi par habitant actif",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+Quelles sont les trois meilleurs villes par département ?
+
+
+```{r emploi_hab_ville2 out.height = "150%"}
+communes %>% 
+  group_by(departement_nom, commune) %>% 
+  summarise(emplois_moy = sum(emploi_par_habitant_actif, 
+                              na.rm = TRUE)) %>% 
+  top_n(3, wt = emplois_moy) %>% 
+  ungroup() %>% 
+  mutate(commune = fct_reorder(commune,
+                               emplois_moy)) %>% 
+  ggplot(aes(x = commune, y = emplois_moy,
+             fill = departement_nom)) +
+  geom_col() +
+  coord_flip() +
+  
+  labs(title = "Nombre d'emploi par habitant actif: les trois meilleures villes par département",
+       subtitle = "Données emploi 2017, données personnes actives 2015",
+       x = "", 
+       y = "Nb d'emploi par habitant actif",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Wow, ce n'est pas du tout la même image. Je reconnais quelques noms, que j'associe à des villes en périphérie de grosse agglo (Labège, St Jean de Védas), et où y a des zones d'activité et des centres commerciaux. Je ne sais pas pour les autres.
+
+En enlevant GERM (28), LABEGE (3.6) et MONTHOUMET (3.2).
+
+```{r map_emploi.hab, out.width = "150%"}
+map_occitanie_communes +
+  geom_sf(data = filter(sf_communes,
+                    emploi_par_habitant_actif < 2),
+    aes(fill = emploi_par_habitant_actif))  +
+  
+  labs(title = "Nombre d'emplois par habitant de la commune",
+       subtitle = "Données: emploi 2017, personnes actives 2015",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+
+```
+
+I am a bit surpised. I can see the towns around Toulouse (toutes les zones d'activité) mais c'est moins clair en périphérie de Montpellier. Il y a les villes dans les Pyrénées. Ca peut refleter les stations de ski ? Pareil pour les villes sur les côtes. Mais la variation dans le Haut Languedoc et la montagne noire, je ne l'explique pas.
+
+**Conclusion**
+
+Les communes avec le plus d'emplois sont les grandes agglomérations. Mais les communes avec le plus d'emploi par habitant actif sont des communes sur le littoral, dans les montagnes, et en périphérie des grandes agglomérations.
+
+# Trajets entrants
+

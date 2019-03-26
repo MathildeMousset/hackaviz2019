@@ -1,0 +1,119 @@
+---
+title: "Exploration de la structure des jeux de données"
+author: "Mathilde Mousset"
+date: "22 mars 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(DataExplorer)
+library(GGally)
+
+source("0_import_clean_data.R")
+```
+
+# COMMUNES
+
+## DataExplorer
+
+Structure du jeu de données :
+
+```{r}
+plot_str(communes, trajets)
+```
+
+Aucune colonne vide, ggod :
+
+```{r}
+introduce(communes)
+```
+
+Première approche des variables : 
+```{r}
+plot_intro(communes)  
+```
+
+WTF 23.4 missing obs ? Let's explore more.
+
+```{r}
+plot_missing(communes)
+```
+
+
+Ok, il faudra faire bien gaffe aux dernières colonnes, les données manquent. Identifier pourquoi (c'et seulement sur un département ? ou sur des communes spécifiques ?)
+
+Est-ce que c'est du au fait que des colonnes ne soient que pour les communes avec plus de 100 habitants ?
+
+```{r}
+
+plot_missing(filter(communes,
+                    habitants_2014 > 100))
+```
+
+Non.
+
+Localisation des données non nulles :
+
+```{r}
+map_occitanie +
+  geom_point(data = filter(communes,
+         !is.na(`2014_sortant_km`)),
+         aes(x = longitude2, y = latitude2))
+```
+
+Clairement, c'est pas une histoire de département.
+
+Je viens de relire, c'était pas 100 habitants, c'était flux de personnes actives qui se déplacent en voiture.
+
+Donc c'est normal que sur la carte on tombe dans les zones les plus peuplées.
+
+
+Plot category columns
+```{r}
+plot_bar(communes)
+```
+
+
+```{r}
+plot_histogram(select(communes,
+                      -latitude2,
+                      -longitude2))
+```
+
+
+```{r}
+plot_qq(select(communes, 
+               habitants_2014,
+               prop_habitants_actifs_2014))
+```
+
+```{r}
+communes %>% 
+  select(-c("commune", "insee", "departement", "statut", "departement_nom")) %>% 
+  na.omit() %>% plot_correlation(maxcat = 5L)
+
+plot_correlation(na.omit(communes), type = "c")
+```
+
+
+```{r}
+plot_correlation(na.omit(communes_2009), type = "c")
+plot_correlation(na.omit(communes_2014), type = "c")
+plot_correlation(na.omit(communes_2015), type = "c")
+```
+
+Pas très intéressant, car finalement, les colonnes qui contiennent des nombres d'habitants qui font quelque chose sont globalement toutes correlées entre elles.
+
+## GGALLY
+
+```{r}
+communes_2009 %>% 
+  select(-c("commune", "insee", "departement", "statut", "departement_nom")) %>% 
+  ggpairs()
+```
+

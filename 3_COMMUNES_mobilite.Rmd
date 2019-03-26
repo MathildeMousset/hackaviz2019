@@ -10,7 +10,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-#knitr::opts_chunk$set(fig.width = 8, fig.height = 6)
+knitr::opts_chunk$set(fig.width = 8, fig.height = 6)
 
 library(tidyverse)
 
@@ -27,7 +27,7 @@ Explorons l'attractivité des communes en terme d'emplois.
 Par département.
 La Haute Garonne est largement en tête, suivie de l'Herault. Pas surprenant, avec Toulouse et Montepllier.
 
-```{r emploi_brut_dep, out.width = "150%"}
+```{r emploi_brut_dep}
 communes %>% 
   group_by(departement_nom) %>% 
   summarise(emplois_tot = sum(emplois_2017, na.rm = TRUE)) %>% 
@@ -127,7 +127,7 @@ communes %>%
 Quelles sont les trois meilleurs villes par département ?
 
 
-```{r emploi_hab_ville2 out.height = "150%"}
+```{r emploi_hab_ville2}
 communes %>% 
   group_by(departement_nom, commune) %>% 
   summarise(emplois_moy = sum(emploi_par_habitant_actif, 
@@ -152,7 +152,7 @@ Wow, ce n'est pas du tout la même image. Je reconnais quelques noms, que j'asso
 
 En enlevant GERM (28), LABEGE (3.6) et MONTHOUMET (3.2).
 
-```{r map_emploi.hab, out.width = "150%"}
+```{r map_emploi.hab, fig.height=15}
 map_occitanie_communes +
   geom_sf(data = filter(sf_communes,
                     emploi_par_habitant_actif < 2),

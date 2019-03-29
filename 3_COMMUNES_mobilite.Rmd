@@ -1,16 +1,20 @@
 ---
-title: "Exploration des données de mobilité"
-output: 
-  html_notebook: 
+title: "Exploration des donnees mobilite"
+output:
+  html_notebook:
     code_folding: hide
     fig_width: 10
+    theme: cosmo
+    toc: yes
+  html_document:
+    keep_md: yes
     theme: cosmo
     toc: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_chunk$set(fig.width = 8, fig.height = 6)
+knitr::opts_chunk$set(fig.width = 8)
 
 library(tidyverse)
 
@@ -24,8 +28,9 @@ Explorons l'attractivité des communes en terme d'emplois.
 
 ## Données brutes
 
-Par département.
-La Haute Garonne est largement en tête, suivie de l'Herault. Pas surprenant, avec Toulouse et Montepllier.
+### Par département
+
+La Haute Garonne est largement en tête, suivie de l'Herault. Pas surprenant, avec Toulouse et Montpellier.
 
 ```{r emploi_brut_dep}
 communes %>% 
@@ -44,7 +49,9 @@ communes %>%
        caption = "Toulouse Hackaviz 2019")
 ```
 
-Quelles sont les villes attractives ?
+### Villes 
+
+Quelle sont les villes qui sont des "poles d'emploi" ?
 
 ```{r emploi_brut_ville, fig.width=10}
 communes %>% 
@@ -66,11 +73,14 @@ communes %>%
        caption = "Toulouse Hackaviz 2019")
 ```
 
+On voit ici que Toulouse et Montpeller sont en tête. Toulouse en particulier est un énorme pole d'emploi.
+
 ## Par nb personnes actives
 
-Attention, la mesure n'est pas exacte, on divise le nombre d'emploi en 2017 par le nombre de personnes actives en 2015. je peux pas faire mieux. Après, ça doit pas changer tant que ça en deux ans, si ?
+Attention, la mesure n'est pas exacte, on divise le nombre d'emploi en 2017 par le nombre de personnes actives en 2015. Je peux pas faire mieux. Après, ça doit pas changer tant que ça en deux ans, si ?
 
-Bon, c'est bien, on sait qu'il y a plein d'emploi à Toulouse, et encore un peu à Montpellier, mais ça fait cmbien d'emplois par personne "active" ?
+Cette mesure nous donne une idée de si des communes offrent énormément d'emploi par rapport à leur population résidente active.
+
 
 ```{r emploi_per_hab1}
 communes %>% 
@@ -90,13 +100,14 @@ communes %>%
        caption = "Toulouse Hackaviz 2019")
 ```
 
-Distribution (en enlevant GERM, où il y a 28 emploi par habitant actif...wtf?)
+Distribution (en enlevant GERM, où il y a 28 emplois par habitant actif...wtf?) 
+
 ```{r emploi.hab}
 communes %>% 
   filter(emploi_par_habitant_actif < 4) %>% 
   ggplot(aes(x = emploi_par_habitant_actif)) +
   geom_histogram() +
-   labs(title = "Nombre d'emploi par habitant actif",
+  labs(title = "Nombre d'emploi par habitant actif",
        subtitle = "Données emploi 2017, données personnes actives 2015",
        x = "Nb d'emplois par habitant actif", 
        y = "",
@@ -124,6 +135,11 @@ communes %>%
 ```
 
 
+GERM : station de ski de Peyragudes dans les Hautes Pyrénées. Il y a des compétitions internationnales de Snowboard, est-ce que ça peut inflater le nb d'emploi ?
+
+LABEGE : énormes zones commerciales à la sortie de Toulouse + poles d'activité. On peut comprendre.
+
+
 Quelles sont les trois meilleurs villes par département ?
 
 
@@ -148,15 +164,15 @@ communes %>%
        caption = "Toulouse Hackaviz 2019")
 ```
 
-Wow, ce n'est pas du tout la même image. Je reconnais quelques noms, que j'associe à des villes en périphérie de grosse agglo (Labège, St Jean de Védas), et où y a des zones d'activité et des centres commerciaux. Je ne sais pas pour les autres.
+Wow, ce n'est pas du tout la même image que pour le nombre d'emploi brut. Je reconnais quelques noms, que j'associe à des villes en périphérie de grosse agglo (Labège, St Jean de Védas), et où y a des zones d'activité et des centres commerciaux. Je ne sais pas pour les autres.
 
-En enlevant GERM (28), LABEGE (3.6) et MONTHOUMET (3.2).
+En enlevant GERM (28), LABEGE (3.6) et MOUTHOUMET (3.2).
 
-```{r map_emploi.hab, fig.height=15}
+```{r map_emploi.hab, fig.width=15}
 map_occitanie_communes +
   geom_sf(data = filter(sf_communes,
-                    emploi_par_habitant_actif < 2),
-    aes(fill = emploi_par_habitant_actif))  +
+                        emploi_par_habitant_actif < 2),
+          aes(fill = emploi_par_habitant_actif))  +
   
   labs(title = "Nombre d'emplois par habitant de la commune",
        subtitle = "Données: emploi 2017, personnes actives 2015",
@@ -175,5 +191,1140 @@ I am a bit surpised. I can see the towns around Toulouse (toutes les zones d'act
 
 Les communes avec le plus d'emplois sont les grandes agglomérations. Mais les communes avec le plus d'emploi par habitant actif sont des communes sur le littoral, dans les montagnes, et en périphérie des grandes agglomérations.
 
-# Trajets entrants
+
+# Considérations générales sur les flux
+
+**Questions**
+
+Quelles sont les communes les plus attractives ? Quelles sont les communes dortoirs ? Où se situent ces communes ? Comment ça varie au fil des années ?
+
+Il y a plusieurs manières de regarder ça. 
+
+En chiffres bruts, on s'attend que les grosses agglo attirent plus, parce qu'il y a plus d'emploi, et que les communes avoisinantes aient plus de flux sortants. Peut être que ça a plus de sens de faire des % de gens allant vers les grandes villes en utilisant le fichier trajet.
+
+Sinon, on peut pondérer les flux. Il y a plusieurs manières que l'on peut envisager. 
+
+- Exprimer les flux sortants et intra par rapport au nombre d'habitants actifs. Si 10% des actifs sortent, alors 90% des actifs travaillent dans la même commune. On ne sait pas combien entrent dans la commune. Les villes dont une large proportion de la population active va travailler dans une autre commune sera qualifiée de ville dortoir. Alors que si une grande proportion de la population active vient d'autres communes, la commune est très attractive.
+
+- on peut pondérer par le nombre d'mploi que la commune offre. Quelle part des gens employés vient de l'extérieur ?
+
+- On peut faire le ratio entre flux intra et flux sortant. Ou le contraire. 
+
+En 2009 et 2014 on n'a pas les différences voiture et sans voiture. On va commencer par là.
+
+
+# 2009
+
+
+## Proportion sortants
+
+Exploration des flux rapportés à la population active de la commune. En d'autres termes, si la proportion de sortants par rapport à la population active est haute, ça veut dire qu'une grosse partie de la force active quitte la commune pour aller travailler ailleurs. Une cité dortoir, quoi.
+
+
+Bon, déjà est-ce qu'on est sur que intra + sortant = actif ?
+
+```{r}
+all.equal(communes_2009$`2009_intra` + communes_2009$`2009_sortant`,
+          communes_2009$personnes_actives_2009)
+```
+Ca a l'air raisonnablement ok.
+
+
+On a des communes avec zero sortants. Ok, fair enough.
+On a aussi des communes avec 100% de sortants. Fair enough.
+Et on a 10 communes avec zero actifs, donc la division a fait des NaNs. Normal.
+
+```{r}
+communes_2009 %>% 
+  ggplot(aes(x = prop_sortant_2009)) +
+  geom_histogram() +
+  
+  labs(title = "Distribution de la proportion de sortants par rapport à la population active",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Plus de sortants que d'entrants ?",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Bon, maintenant on va regarder ça par classe de taille de commune.
+
+```{r}
+communes_2009 %>% 
+  ggplot(aes(x = prop_sortant_2009,
+             fill = if_else(prop_sortant_2009 < 0.5, 
+                            "attracteur", "dortoir"))) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distribution de la proportion de sortants par rapport à la population active",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Plus de sortants?",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Bon, c'est dur de comparer, parce qu'il y a deux métropoles, cinq grandes villes et 16 moyennes villes, mais les catégories en dessous de ça ont clairement un problème de perte d'actifs qui vont travailler ailleurs. Enfin, un problème, j'en sais rien, s'il n'y a pas d'emploi, c'est pas une mauvaise chose.
+
+On dirait que pour les moyennes villes la distribution est bimodale. Je parie que c'est la différence entre les comunes limitrophes de Toulouse et celles qui sont éloignées d'un grand pole (qui **sont** le grand pole du coin). Let's check.
+
+
+```{r}
+communes_2009 %>% 
+  filter(type_commune == "moyenne ville") %>% 
+  mutate(commune = fct_reorder(commune, prop_sortant_2009)) %>% 
+  ggplot(aes(x = commune, y = prop_sortant_2009,
+             fill = if_else(prop_sortant_2009 < 0.5, 
+                            "attracteur", "dortoir"))) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Proportion de sortants par rapport à la population active dans les villes moyennes d'Occitanie",
+       subtitle = "Données 2009. L'opposition entre les villes de périphérie d'agglomération et les autres",
+       x = "", y = "",
+       fill = "type de commune",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Well, c'était pas mauvais comme hypothèse : les communes qui attirent le plus sont celles qui sont leur propre pôle : Carcassonne, Millau, Auch, Castres, Albi... Alors que celles qui perdent le plus sont celles qui sont accolées à de grandes agglomérations (Tournefeuille, Muret, Frontignant...).
+
+Je suis sûre que c'est pareil pour les petites villes, mais là on va pas s'en sortir en les filtrant. on va faire une belle carte. Enfin, une carte déjà.
+
+```{r map_prop_sortants_2009, fig.width=15}
+
+map_occitanie_communes_no_border +
+  aes(fill = prop_sortant_2009_cat) +
+  
+  labs(title = "Proportion de sortants par rapport à la population active",
+       subtitle = "Données 2009. Belle démonstration de l'effet puit des grosses agglomérations et de la dortoirisation de leur périphérie.",
+       x = "", y = "",
+       fill = "Proportion de sortants",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_brewer(type = "seq",
+                    palette = "RdBu")
+```
+
+C'est une belle carte !
+
+
+```{r map_prop_sortants_2009(2), fig.width=15}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2,
+                 colour = prop_sortant_2009_cat,
+                 size = habitants_2014),
+             alpha = 1) +
+  
+  geom_text_repel(data = subset(communes, habitants_2014 > 50000),
+                  aes(x = longitude2, y = latitude2),
+                  label = subset(communes, habitants_2014 > 50000)$commune,
+                  segment.size  = 0.5,
+                  segment.color = "grey50")  +
+  
+  labs(title = "Proportion de sortants par rapport à la population active",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Proportion de sortants",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_colour_brewer(type = "seq",
+                      palette = "RdBu")
+```
+
+
+## Correlations
+
+Altitude
+
+```{r corr_alti_2009}
+communes %>% 
+  ggplot(aes(x = altitude_moy,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune)
+```
+
+
+```{r corr_revenu_2009}
+communes %>% 
+  ggplot(aes(x = revenu_median,
+             y = prop_sortant_2009,
+             colour = altitude_moy)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+
+```{r corr_superficie_2009}
+communes %>% 
+  ggplot(aes(x = superficie,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+```{r corr_emploi_2009}
+communes %>% 
+  ggplot(aes(x = emplois_2017,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+emploi par habitant actif. Attention, on enlève les trois points avec plus de 3 emplois par habitant actif.
+
+```{r corr_emploi.actif_2009}
+communes %>% 
+  filter(emploi_par_habitant_actif < 3) %>% 
+  ggplot(aes(x = emploi_par_habitant_actif,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+```{r corr_prop.actif_2009}
+communes %>% 
+  filter(prop_habitants_actifs_2014 <=1) %>% 
+  ggplot(aes(x = prop_habitants_actifs_2014,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+```{r corr_hab.hectare_2009}
+communes %>% 
+  filter(emploi_par_habitant_actif < 3) %>% 
+  ggplot(aes(x = emploi_par_habitant_actif,
+             y = prop_sortant_2009)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+
+## Nb de communes sortants
+
+```{r}
+communes_2009 %>% 
+  ggplot(aes(x = `2009_sortant_communes`)) +
+  geom_histogram() +
+  
+  labs(title = "Distribution du nombre de communes de travail pour les navetteurs",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = `2009_sortant_communes`) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               `2009_sortant_communes`)) %>% 
+  ggplot(aes(x = commune, y = `2009_sortant_communes`)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Nombre de communes de destination des sortants",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Yeah, should have figures that the larger the twon, the more people, so the more destinations...
+
+
+Let's do it by commuter going out
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_communes_sortants_par_sortant_2009) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_communes_sortants_par_sortant_2009)) %>% 
+  ggplot(aes(x = commune, y = nb_communes_sortants_par_sortant_2009)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Nombre de communes de destination des sortants (par navetteur",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Congratullations, maintenant je n'ai plus aucune idée de où sont les communes repréesentées. Nope.
+
+Bon, on reprend.
+```{r}
+communes_2009 %>% 
+  ggplot(aes(x = 100 * nb_communes_sortants_par_sortant_2009)) +
+  geom_histogram() +
+  
+  labs(title = "Distribution du nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes_2009 %>% 
+  ggplot(aes(x = 100 * nb_communes_sortants_par_sortant_2009)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distribution du nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_prop_sortants_communes_2009, fig.width=15}
+
+map_occitanie_communes_no_border +
+  aes(fill = 100 * nb_communes_sortants_par_sortant_2009) +
+  
+  labs(title = "Nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Nb communes pour 100 navetteurs",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+Mouais, pas clair. En plus il nous manque toutes les communes ou le flux de sortants était inférieur à 100 personnes.
+
+Bon, on laisse tomber et on regarde le temps et la distance.
+
+
+## Distance parcourue par les navetteurs sortants
+
+### Distance totale
+
+Définition de la variable :
+
+total de km parcourus tous les jours (A-R) **en voiture** par toutes les personnes actives de la commune de résidence qui travaillent en dehors de la commune de résidence en 2009   - 
+
+UNIQUEMENT lorsque le flux vers la commune de travail est > 100 personnes 
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = `2009_sortant_km`)) +
+  geom_histogram() +
+  
+  labs(title = "Distance parcourue par les naveteurs sortants",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Hum, on n'a *PAS DU TOUT* des valeurs extrêmes cheloues. The hell!
+
+```{r}
+communes %>% 
+  top_n(15, wt = `2009_sortant_km`) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               `2009_sortant_km`)) %>% 
+  ggplot(aes(x = commune, y = `2009_sortant_km`)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Distance parcourue par les naveteurs sortants",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Bon, comme c'est pour tous les navetteurs sortants, on a des chiffres qui reflettent le nombre de navetteurs. Et qui sont franchement difficile à concevoir. Moi je travaille pas avec ça.
+
+Ah si, on peut calculer la quantité de CO2 que ça représente.
+
+
+
+```{r}
+co2_vehicule <- 135  # g/km
+```
+
+```{r}
+communes %>% 
+  summarise(total_km_sortant_2009 = sum(`2009_sortant_km`, 
+                                        na.rm = TRUE)) %>% 
+  mutate(total_CO2_sortant_2009 = co2_vehicule * total_km_sortant_2009,
+         total_CO2_tonnes_2009 = total_CO2_sortant_2009 * 0.000001)
+```
+
+
+
+### Par navetteur
+
+Bon, on a le nombre total de km AR pour tout les navetteurs sortants. On va rammener ça au nombre de navetteurs sortants, ça sera plus facile à appréhender, et plus intéressant.
+
+```{r}
+communes %>% 
+  summarise(moy = mean(nb_km_sortants_par_sortant_2009, 
+                       na.rm = TRUE),
+            med = median(nb_km_sortants_par_sortant_2009, 
+                       na.rm = TRUE),
+            sd = sd(nb_km_sortants_par_sortant_2009, 
+                       na.rm = TRUE)) %>% 
+  mutate_all(round, 1)
+```
+
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_km_sortants_par_sortant_2009) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_km_sortants_par_sortant_2009)) %>% 
+  ggplot(aes(x = commune, y = nb_km_sortants_par_sortant_2009)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2009)) +
+  geom_histogram() +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2009)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_nb_km_par_nav_sortant_2009, fig.width=15}
+map_occitanie_communes_no_border +
+  aes(fill = nb_km_sortants_par_sortant_2009) +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+```{r map_nb_km_par_nav_sortant_2009(2), fig.width=15}
+ggplot() +
+  geom_sf(data = sf_communes, colour = NA) +
+  coord_sf(crs = 4326, datum = sf::st_crs(4326))  +
+  theme_minimal() +
+  
+  geom_sf(data = filter(sf_communes,
+                      !is.na(nb_km_sortants_par_sortant_2009_cat)),
+        aes(fill =  nb_km_sortants_par_sortant_2009_cat),
+        colour = NA) +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_brewer(type = "seq",
+                    palette = "Oranges",
+                    direction = 1)
+```
+
+
+
+
+## Temps passé dans la voiture pour les navetteurs sortants
+
+### Par navetteur
+
+Regardons à présent le temps moyen passé dans la voiture  par navetteur pour chaque communes.
+
+```{r}
+communes %>% 
+  summarise(moy = mean(nb_h_par_sortant_2009, 
+                       na.rm = TRUE),
+            med = median(nb_h_par_sortant_2009, 
+                       na.rm = TRUE),
+            sd = sd(nb_h_par_sortant_2009, 
+                       na.rm = TRUE)) %>% 
+  mutate_all(round, 1)
+```
+
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_h_par_sortant_2009) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_h_par_sortant_2009)) %>% 
+  ggplot(aes(x = commune, y = nb_h_par_sortant_2009)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Temps passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_h_par_sortant_2009)) +
+  geom_histogram() +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant par commune",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_h_par_sortant_2009)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_nb_h_par_nav_sortant_2009, fig.width=15}
+map_occitanie_communes_no_border +
+  aes(fill = nb_h_par_sortant_2009) +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2009",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2009,
+             y = nb_h_par_sortant_2009)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth() +
+  geom_text_repel(data = filter(communes,
+                          nb_h_par_sortant_2009 > 0.8 |
+                          nb_km_sortants_par_sortant_2009 > 40),
+    aes(label = commune))
+```
+
+
+## Comparaison entrants et sortants
+
+### Nb de communes
+
+```{r}
+communes %>%
+  mutate(sortant.entrant = `2009_sortant_communes`/ `2009_entrant_communes`) %>% 
+  ggplot(aes(x = `2009_sortant_communes`,
+             y = `2009_entrant_communes`)) +
+  geom_point(aes(size = habitants_2014),
+             alpha = 0.5) +
+  geom_abline(slope = 1,
+              intercept = 0) +
+  geom_text_repel(data = filter(communes,
+                                `2009_entrant_communes` > 25),
+    aes(label = commune)) +
+  labs(title = "Déséquilibre entre nombre de commune d'origine et de destination",
+       subtitle = "Données 2009")
+```
+
+## Nb de km
+
+```{r}
+communes %>%
+  ggplot(aes(x = `2009_sortant_km`,
+             y = `2009_entrant_km`)) +
+  geom_point(aes(size = habitants_2014),
+             alpha = 0.5) +
+  geom_abline(slope = 1,
+              intercept = 0) +
+  geom_text_repel(data = filter(communes,
+                                `2009_entrant_km` > 500000),
+    aes(label = commune)) +
+  labs(title = "Déséquilibre entre nombre de km entrants et sortants",
+       subtitle = "Données 2009")
+```
+
+
+
+# 2014
+
+
+## Proportion sortants
+
+Exploration des flux rapportés à la population active de la commune. En d'autres termes, si la proportion de sortants par rapport à la population active est haute, ça veut dire qu'une grosse partie de la force active quitte la commune pour aller travailler ailleurs. Une cité dortoir, quoi.
+
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = prop_sortant_2014)) +
+  geom_histogram() +
+  
+  labs(title = "Distribution de la proportion de sortants par rapport à la population active",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Plus de sortants que d'entrants ?",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+Bon, maintenant on va regarder ça par classe de taille de commune.
+
+```{r}
+communes %>% 
+  ggplot(aes(x = prop_sortant_2014,
+             fill = if_else(prop_sortant_2014 < 0.5, 
+                            "attracteur", "dortoir"))) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distribution de la proportion de sortants par rapport à la population active",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Plus de sortants?",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  filter(type_commune == "moyenne ville") %>% 
+  mutate(commune = fct_reorder(commune, prop_sortant_2014)) %>% 
+  ggplot(aes(x = commune, y = prop_sortant_2014,
+             fill = if_else(prop_sortant_2014 < 0.5, 
+                            "attracteur", "dortoir"))) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Proportion de sortants par rapport à la population active dans les villes moyennes d'Occitanie",
+       subtitle = "Données 2014. L'opposition entre les villes de périphérie d'agglomération et les autres",
+       x = "", y = "",
+       fill = "type de commune",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+
+```{r map_prop_sortants_2014, fig.width=15}
+
+map_occitanie_communes_no_border +
+  aes(fill = prop_sortant_2014_cat) +
+  
+  labs(title = "Proportion de sortants par rapport à la population active",
+       subtitle = "Données 2014. Belle démonstration de l'effet puit des grosses agglomérations et de la dortoirisation de leur périphérie.",
+       x = "", y = "",
+       fill = "Proportion de sortants",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_brewer(type = "seq",
+                    palette = "RdBu")
+```
+
+
+
+```{r map_prop_sortants_2014(2), fig.width=15}
+map_occitanie +
+  geom_point(data = communes,
+             aes(x = longitude2, y = latitude2,
+                 colour = prop_sortant_2014_cat,
+                 size = habitants_2014),
+             alpha = 1) +
+  
+  geom_text_repel(data = subset(communes, habitants_2014 > 50000),
+                  aes(x = longitude2, y = latitude2),
+                  label = subset(communes, habitants_2014 > 50000)$commune,
+                  segment.size  = 0.5,
+                  segment.color = "grey50")  +
+  
+  labs(title = "Proportion de sortants par rapport à la population active",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Proportion de sortants",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_colour_brewer(type = "seq",
+                      palette = "RdBu")
+```
+
+
+## Correlations
+
+Altitude
+
+```{r corr_alti_2014}
+communes %>% 
+  ggplot(aes(x = altitude_moy,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune)
+```
+
+
+```{r corr_revenu_2014}
+communes %>% 
+  ggplot(aes(x = revenu_median,
+             y = prop_sortant_2014,
+             colour = altitude_moy)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+
+```{r corr_superficie_2014}
+communes %>% 
+  ggplot(aes(x = superficie,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+```{r corr_emploi_2014}
+communes %>% 
+  ggplot(aes(x = emplois_2017,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+emploi par habitant actif. Attention, on enlève les trois points avec plus de 3 emplois par habitant actif.
+
+```{r corr_emploi.actif_2014}
+communes %>% 
+  filter(emploi_par_habitant_actif < 3) %>% 
+  ggplot(aes(x = emploi_par_habitant_actif,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+```{r corr_prop.actif_2014}
+communes %>% 
+  filter(prop_habitants_actifs_2014 <=1) %>% 
+  ggplot(aes(x = prop_habitants_actifs_2014,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+```{r corr_hab.hectare_2014}
+communes %>% 
+  filter(emploi_par_habitant_actif < 3) %>% 
+  ggplot(aes(x = emploi_par_habitant_actif,
+             y = prop_sortant_2014)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~type_commune, scales = "free")
+```
+
+
+
+## Nb de communes sortants par navetteur sortant
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_communes_sortants_par_sortant_2014) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_communes_sortants_par_sortant_2014)) %>% 
+  ggplot(aes(x = commune, y = nb_communes_sortants_par_sortant_2014)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Nombre de communes de destination des sortants (par navetteur",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = 100 * nb_communes_sortants_par_sortant_2014)) +
+  geom_histogram() +
+  
+  labs(title = "Distribution du nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = 100 * nb_communes_sortants_par_sortant_2014)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distribution du nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_prop_sortants_communes_2014, fig.width=15}
+
+map_occitanie_communes_no_border +
+  aes(fill = 100 * nb_communes_sortants_par_sortant_2014) +
+  
+  labs(title = "Nombre de communes de travail pour 100 navetteurs",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Nb communes pour 100 navetteurs",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+
+## Distance parcourue par les navetteurs sortants
+
+### Distance totale
+
+Définition de la variable :
+
+total de km parcourus tous les jours (A-R) **en voiture** par toutes les personnes actives de la commune de résidence qui travaillent en dehors de la commune de résidence en 2014   - 
+
+UNIQUEMENT lorsque le flux vers la commune de travail est > 100 personnes 
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = `2014_sortant_km`)) +
+  geom_histogram() +
+  
+  labs(title = "Distance parcourue par les naveteurs sortants",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = `2014_sortant_km`) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               `2014_sortant_km`)) %>% 
+  ggplot(aes(x = commune, y = `2014_sortant_km`)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Distance parcourue par les naveteurs sortants",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+
+```{r}
+communes %>% 
+  summarise(total_km_sortant_2014 = sum(`2014_sortant_km`, 
+                                        na.rm = TRUE)) %>% 
+  mutate(total_CO2_sortant_2014 = co2_vehicule * total_km_sortant_2014,
+         total_CO2_tonnes_2014 = total_CO2_sortant_2014 * 0.000001)
+```
+
+
+
+### Par navetteur
+
+Bon, on a le nombre total de km AR pour tout les navetteurs sortants. On va rammener ça au nombre de navetteurs sortants, ça sera plus facile à appréhender, et plus intéressant.
+
+```{r}
+communes %>% 
+  summarise(moy = mean(nb_km_sortants_par_sortant_2014, 
+                       na.rm = TRUE),
+            med = median(nb_km_sortants_par_sortant_2014, 
+                       na.rm = TRUE),
+            sd = sd(nb_km_sortants_par_sortant_2014, 
+                       na.rm = TRUE)) %>% 
+  mutate_all(round, 1)
+```
+
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_km_sortants_par_sortant_2014) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_km_sortants_par_sortant_2014)) %>% 
+  ggplot(aes(x = commune, y = nb_km_sortants_par_sortant_2014)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2014)) +
+  geom_histogram() +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2014)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_nb_km_par_nav_sortant_2014, fig.width=15}
+map_occitanie_communes_no_border +
+  aes(fill = nb_km_sortants_par_sortant_2014) +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+```{r map_nb_km_par_nav_sortant_2014(2), fig.width=15}
+ggplot() +
+  geom_sf(data = sf_communes, colour = NA) +
+  coord_sf(crs = 4326, datum = sf::st_crs(4326))  +
+  theme_minimal() +
+  
+  geom_sf(data = filter(sf_communes,
+                      !is.na(nb_km_sortants_par_sortant_2014_cat)),
+        aes(fill =  nb_km_sortants_par_sortant_2014_cat),
+        colour = NA) +
+  
+  labs(title = "Distance moyenne parcourue par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_brewer(type = "seq",
+                    palette = "Oranges",
+                    direction = 1)
+```
+
+
+
+## Temps passé dans la voiture pour les navetteurs sortants
+
+### Par navetteur
+
+Regardons à présent le temps moyen passé dans la voiture  par navetteur pour chaque communes.
+
+```{r}
+communes %>% 
+  summarise(moy = mean(nb_h_par_sortant_2014, 
+                       na.rm = TRUE),
+            med = median(nb_h_par_sortant_2014, 
+                       na.rm = TRUE),
+            sd = sd(nb_h_par_sortant_2014, 
+                       na.rm = TRUE)) %>% 
+  mutate_all(round, 1)
+```
+
+
+
+```{r}
+communes %>% 
+  top_n(15, wt = nb_h_par_sortant_2014) %>% 
+  mutate(commune = fct_reorder(commune, 
+                               nb_h_par_sortant_2014)) %>% 
+  ggplot(aes(x = commune, y = nb_h_par_sortant_2014)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Temps passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_h_par_sortant_2014)) +
+  geom_histogram() +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant par commune",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_h_par_sortant_2014)) +
+  geom_histogram() +
+  facet_wrap(~type_commune, scales = "free_y") +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       caption = "Toulouse Hackaviz 2019")
+```
+
+
+```{r map_nb_h_par_nav_sortant_2014, fig.width=15}
+map_occitanie_communes_no_border +
+  aes(fill = nb_h_par_sortant_2014) +
+  
+  labs(title = "Temps moyen passé dans la voiture par naveteur sortant",
+       subtitle = "Données 2014",
+       x = "", y = "",
+       fill = "Longueur moyenne trajet AR (km)",
+       caption = "Toulouse Hackaviz 2019") +
+  
+  scale_fill_distiller(type = "seq",
+                       palette = "Oranges",
+                       direction = 1)
+```
+
+
+```{r}
+communes %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2014,
+             y = nb_h_par_sortant_2014)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth() +
+  geom_text_repel(data = filter(communes,
+                          nb_h_par_sortant_2014 > 0.8 |
+                          nb_km_sortants_par_sortant_2014 > 40),
+    aes(label = commune))
+```
+
+# Some numbers
+
+Si on poole tout le monde : 
+
+```{r}
+communes %>% 
+  summarise(somme_habitants_2014 = sum(habitants_2014, 
+                                       na.rm = TRUE),
+            
+            somme_superficie = sum(superficie, na.rm = TRUE),
+            somme_superficie_km2 = somme_superficie / 100,
+            
+            habitants_hectares = somme_habitants_2014 / somme_superficie,
+            habitants_hectares = somme_habitants_2014 / somme_superficie_km2,
+            somme_actifs_2009 = sum(personnes_actives_2009, 
+                                    na.rm = TRUE),
+            somme_actifs_2014 = sum(personnes_actives_2014, 
+                                    na.rm = TRUE),
+            somme_actifs_2015 = sum(personnes_actives_2015, 
+                                    na.rm = TRUE),
+            
+            proportion_hab_actifs = 100* somme_actifs_2014 / somme_habitants_2014,
+            
+            somme_sortants_2009 = sum(`2009_sortant`, na.rm = TRUE),
+            somme_sortants_2014 = sum(`2014_sortant`, na.rm = TRUE),
+            
+            prop_sortants_2009 = 100 * somme_sortants_2009 / somme_actifs_2009,
+            prop_sortants_2014 = 100 * somme_sortants_2014 / somme_actifs_2014, 
+            
+            prop_intra_2009 = 100 - prop_sortants_2009,
+            prop_intra_2014 = 100 - prop_sortants_2014
+  ) %>% 
+  mutate_all(round, 1) %>% 
+  gather()
+```
+
+
+```{r}
+communes %>% 
+  group_by(type_commune) %>% 
+  summarise(somme_habitants_2014 = sum(habitants_2014, 
+                                       na.rm = TRUE),
+            prop_habitants_occitanie = 100 * somme_habitants_2014 / 5730753.0,
+            somme_superficie = sum(superficie, na.rm = TRUE),
+            somme_superficie_km2 = somme_superficie / 100,
+            
+            habitants_hectares = somme_habitants_2014 / somme_superficie,
+            habitants_hectares = somme_habitants_2014 / somme_superficie_km2,
+            
+            somme_actifs_2009 = sum(personnes_actives_2009, 
+                                    na.rm = TRUE),
+            somme_actifs_2014 = sum(personnes_actives_2014, 
+                                    na.rm = TRUE),
+            somme_actifs_2015 = sum(personnes_actives_2015, 
+                                    na.rm = TRUE),
+            
+            proportion_hab_actifs = 100 * somme_actifs_2014 / somme_habitants_2014,
+            
+            somme_sortants_2009 = sum(`2009_sortant`, na.rm = TRUE),
+            somme_sortants_2014 = sum(`2014_sortant`, na.rm = TRUE),
+            
+            prop_sortants_2009 = 100 * somme_sortants_2009 / somme_actifs_2009,
+            prop_sortants_2014 = 100* somme_sortants_2014 / somme_actifs_2014, 
+            
+            prop_intra_2009 = 100 - prop_sortants_2009,
+            prop_intra_2014 = 100 - prop_sortants_2014
+  ) %>% 
+  mutate_if(is.numeric, round, 1)
+```
 

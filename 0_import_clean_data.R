@@ -23,7 +23,7 @@ library(sp)
 # import data -------------------------------------------------------------
 
 commune <- read_csv("par_commune.csv")
-trajet <- read_csv("par_trajet.csv")
+# trajet <- read_csv("par_trajet.csv")
 
 #unzip(file.path(extraWD, "departement.zip"), exdir = extraWD)
 
@@ -80,6 +80,13 @@ communes <- commune %>%
            between(habitants_2014, 20000,   49999) ~ "moyenne ville",
            between(habitants_2014, 50000,   199999) ~ "grande ville",
            habitants_2014 > 200000 ~ "metropole"),
+         
+         
+         type_commune_simpler = case_when(
+           habitants_2014 < 1999 ~ "Village",
+           between(habitants_2014, 2000,   4999) ~ "Bourg",
+           between(habitants_2014, 5000,   49999) ~ "Petites et moyennes villes",
+           habitants_2014 > 50000 ~ "Grande ville et métropoles"),
          
          habitants_per_hectare = habitants_2014 / superficie,
          
@@ -168,6 +175,12 @@ sf_communes <- sf_commune %>%
            between(habitants_2014, 50000,   199999) ~ "grande ville",
            habitants_2014 > 200000 ~ "metropole"),
          
+         type_commune_simpler = case_when(
+           habitants_2014 < 1999 ~ "Village",
+           between(habitants_2014, 2000,   4999) ~ "Bourg",
+           between(habitants_2014, 5000,   49999) ~ "Petites et moyennes villes",
+           habitants_2014 > 50000 ~ "Grande ville et métropoles"),
+         
          habitants_per_hectare = habitants_2014 / superficie,
          
          menages_per_hectare   = menages_2014 / superficie,
@@ -230,7 +243,11 @@ communes <- communes %>%
          
          type_commune = fct_reorder(type_commune, 
                                     habitants_2014,
-                                    mean, na.rm = TRUE))
+                                    mean, na.rm = TRUE),
+         
+         type_commune_simpler = fct_reorder(type_commune_simpler, 
+                                            habitants_2014,
+                                            mean, na.rm = TRUE))
 
 
 sf_communes <- sf_communes %>% 
@@ -239,6 +256,10 @@ sf_communes <- sf_communes %>%
                                           mean, na.rm = TRUE),
          
          type_commune = fct_reorder(type_commune, 
+                                    habitants_2014,
+                                    mean, na.rm = TRUE),
+         
+         type_commune_simpler = fct_reorder(type_commune_simpler, 
                                     habitants_2014,
                                     mean, na.rm = TRUE))
 

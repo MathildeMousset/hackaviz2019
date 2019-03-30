@@ -1,0 +1,380 @@
+---
+title: "2009 vs 2014"
+output:
+  html_notebook:
+    code_folding: hide
+    fig_width: 10
+    theme: cosmo
+    toc: yes
+  html_document:
+    keep_md: yes
+    theme: cosmo
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.width = 8)
+
+library(tidyverse)
+
+source("0_import_clean_data.R")
+```
+
+```{r}
+PI <- function(ancien, nouveau) {
+  a <- ifelse(ancien > nouveau,
+              1 - nouveau/ancien,
+              ancien/nouveau - 1)
+  return(a)
+}
+```
+
+
+
+```{r}
+time <- sf_communes %>% select(contains("20"),
+                            commune,
+                            latitude2,
+                            longitude2,
+                            altitude_moy,
+                            departement_nom,
+                            superficie,
+                            revenu_median,
+                            type_commune,
+                            habitants_per_hectare,
+                            emploi_par_habitant_actif,
+                            geometry) %>% 
+  select(-contains("2015")) %>% 
+  
+  mutate(PI_prop_sortants = PI(prop_sortant_2009, prop_sortant_2014),
+         PI_km_sortants = PI(nb_km_sortants_par_sortant_2009,
+                             nb_km_sortants_par_sortant_2014),
+          PI_h_sortants = PI(nb_h_par_sortant_2009,
+                             nb_h_par_sortant_2014))
+  
+
+```
+
+
+# Comparaison proportion sortants
+
+```{r}
+time %>% 
+  ggplot(aes(x = prop_sortant_2009,
+             y = prop_sortant_2014, 
+             colour = revenu_median,
+             size = habitants_2014)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0,
+              colour = "red", size = 2) +
+  scale_color_viridis_c()
+```
+
+
+```{r}
+communes %>% 
+  select(prop_sortant_2009, prop_sortant_2014) %>% 
+  gather() %>% 
+  mutate(year = parse_number(key)) %>% 
+  group_by(year) %>% 
+  summarise(moy = mean(value, na.rm = TRUE),
+            med = median(value, na.rm = TRUE),
+            sd  = sd(value, na.rm = TRUE),
+            min = min(value, na.rm = TRUE),
+            max = max(value, na.rm = TRUE)) %>% 
+  mutate_all(round, 2)
+```
+
+
+Message : en moyenne, la proportion de sortants par rapport à la population active n'a pas changé entre 2009 et 2014. Bien sûr, il y a des communes qui ont augmenté, et d'autre diminué, mais la moyenne régionale est stable.
+
+Par département ?
+
+
+```{r}
+communes %>% 
+  select(departement_nom,
+         prop_sortant_2009, prop_sortant_2014) %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy_2009 = mean(prop_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(prop_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = departement_nom,
+             colour = departement_nom)) +
+  geom_point() +
+  geom_line()
+  
+```
+
+
+Par type de commune ?
+
+```{r}
+communes %>% 
+  select(type_commune,
+         prop_sortant_2009, prop_sortant_2014) %>% 
+  group_by(type_commune) %>% 
+  summarise(moy_2009 = mean(prop_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(prop_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = type_commune,
+             colour = type_commune)) +
+  geom_point() +
+  geom_line()
+```
+
+
+```{r map_prop_sortants, fig.width=15}
+map_occitanie_communes_no_border +
+  geom_sf(data = time,
+         aes(fill = PI_prop_sortants),
+         colour = NA) +
+  
+  labs(title = "Evolution temporelle de la proportion de sortants",
+       subtitle = "En % de réduction") +
+ 
+  scale_fill_distiller(type = "div",
+                       palette = "PuOr")
+
+```
+
+
+```{r map_prop_sortants(2), fig.width=15}
+map_occitanie +
+  geom_point(data = time,
+         aes(x = longitude2,
+             y = latitude2,
+           colour = PI_prop_sortants,
+           size = habitants_2014)) +
+  
+  labs(title = "Evolution temporelle de la proportion de sortants",
+       subtitle = "En % de réduction") +
+ 
+  scale_colour_distiller(type = "div",
+                       palette = "PuOr")
+
+```
+
+
+# Comparaison nb km sortants
+
+```{r}
+time %>% 
+  ggplot(aes(x = nb_km_sortants_par_sortant_2009,
+             y = nb_km_sortants_par_sortant_2014, 
+             colour = revenu_median,
+             size = habitants_2014)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0,
+              colour = "red", size = 2) +
+  scale_color_viridis_c()
+```
+
+
+```{r}
+communes %>% 
+  select(nb_km_sortants_par_sortant_2009, nb_km_sortants_par_sortant_2014) %>% 
+  gather() %>% 
+  mutate(year = parse_number(key)) %>% 
+  group_by(year) %>% 
+  summarise(moy = mean(value, na.rm = TRUE),
+            med = median(value, na.rm = TRUE),
+            sd  = sd(value, na.rm = TRUE),
+            min = min(value, na.rm = TRUE),
+            max = max(value, na.rm = TRUE)) %>% 
+  mutate_all(round, 2)
+```
+
+
+Par département ?
+
+
+```{r}
+communes %>% 
+  select(departement_nom,
+         nb_km_sortants_par_sortant_2009, nb_km_sortants_par_sortant_2014) %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy_2009 = mean(nb_km_sortants_par_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(nb_km_sortants_par_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = departement_nom,
+             colour = departement_nom)) +
+  geom_point() +
+  geom_line()
+  
+```
+
+
+Par type de commune ?
+
+```{r}
+communes %>% 
+  select(type_commune,
+         nb_km_sortants_par_sortant_2009, nb_km_sortants_par_sortant_2014) %>% 
+  group_by(type_commune) %>% 
+  summarise(moy_2009 = mean(nb_km_sortants_par_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(nb_km_sortants_par_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = type_commune,
+             colour = type_commune)) +
+  geom_point() +
+  geom_line()
+```
+
+
+
+
+
+```{r map_km_sortants, fig.width=15}
+map_occitanie_communes_no_border +
+  geom_sf(data = time,
+         aes(fill = PI_km_sortants),
+         colour = NA) +
+  
+  labs(title = "Evolution temporelle de la distance parcourue",
+       subtitle = "En % de réduction") +
+ 
+  scale_fill_distiller(type = "div",
+                       palette = "PuOr")
+
+```
+
+
+```{r map_km_sortants(2), fig.width=15}
+map_occitanie +
+  geom_point(data = time,
+         aes(x = longitude2,
+             y = latitude2,
+           colour = PI_km_sortants,
+           size = habitants_2014)) +
+  
+  labs(title = "Evolution temporelle de la distance parcourue",
+       subtitle = "En % de réduction") +
+ 
+  scale_colour_distiller(type = "div",
+                       palette = "PuOr")
+
+```
+
+
+# Comparaison temps de trajet sortants
+
+```{r}
+time %>% 
+  ggplot(aes(x = nb_h_par_sortant_2009,
+             y = nb_h_par_sortant_2014, 
+             colour = revenu_median,
+             size = habitants_2014)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0,
+              colour = "red", size = 2) +
+  scale_color_viridis_c()
+```
+
+
+```{r}
+communes %>% 
+  select(nb_h_par_sortant_2009, nb_h_par_sortant_2014) %>% 
+  gather() %>% 
+  mutate(year = parse_number(key)) %>% 
+  group_by(year) %>% 
+  summarise(moy = mean(value, na.rm = TRUE),
+            med = median(value, na.rm = TRUE),
+            sd  = sd(value, na.rm = TRUE),
+            min = min(value, na.rm = TRUE),
+            max = max(value, na.rm = TRUE)) %>% 
+  mutate_all(round, 2)
+```
+
+
+Par département ?
+
+
+```{r}
+communes %>% 
+  select(departement_nom,
+         nb_h_par_sortant_2009, nb_h_par_sortant_2014) %>% 
+  group_by(departement_nom) %>% 
+  summarise(moy_2009 = mean(nb_h_par_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(nb_h_par_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = departement_nom,
+             colour = departement_nom)) +
+  geom_point() +
+  geom_line()
+  
+```
+
+
+Par type de commune ?
+
+```{r}
+communes %>% 
+  select(type_commune,
+         nb_h_par_sortant_2009, nb_h_par_sortant_2014) %>% 
+  group_by(type_commune) %>% 
+  summarise(moy_2009 = mean(nb_h_par_sortant_2009, na.rm = TRUE),
+            moy_2014 = mean(nb_h_par_sortant_2014, na.rm = TRUE)) %>% 
+  gather(key   = "year", 
+         value = "prop_sortants",
+           moy_2009, moy_2014) %>% 
+  mutate(year = parse_number(year)) %>% 
+  ggplot(aes(x = year,
+             y = prop_sortants,
+             group = type_commune,
+             colour = type_commune)) +
+  geom_point() +
+  geom_line()
+```
+
+
+
+# Numbers
+
+```{r}
+communes %>% 
+  select(`2009_sortant_km`, `2014_sortant_km`,
+         `2009_sortant_heure`, `2014_sortant_heure`) %>% 
+  mutate(`2009_co2` = 0.000001 * `2009_sortant_km` * co2_vehicule,
+         `2014_co2` = 0.000001* `2014_sortant_km` * co2_vehicule) %>% 
+  summarise_all(sum, na.rm = TRUE) %>% 
+  gather() %>% 
+  mutate(year = parse_number(key),
+         variable = str_replace(key, pattern = "2014|2009", "")) %>% 
+  select(-key) %>% 
+  spread(year, value) %>% 
+  mutate(`2014`-`2009`)
+
+```
+
+
+```{r}
+co2_vehicule <- 135  # g/km
+```
+
